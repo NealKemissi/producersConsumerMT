@@ -8,12 +8,17 @@
 #include <unistd.h>
 #include "bitmap.h"
 #include <stdint.h>
+#include <dirent.h>
+#include "string.h"
+#include <pthread.h>
 
 #define DIM 3
 #define LENGHT DIM
 #define OFFSET DIM /2
 #define STACK_MAX 10
 #define NB_THREADS_MAX 2
+#define INPUT_DIR "/input"
+#define OUTPUT_DIR "/output"
 
 const float KERNEL[DIM][DIM] = {{-1, -1,-1},
 							   {-1,8,-1},
@@ -75,6 +80,42 @@ void* producer(void* arg) {
 	return NULL;
 }
 
+//********************************** deuxieme methode
+void* producing(void* arg);
+void *producing(void* arg) {
+	/** pointer du repertoire d'entree **/
+	struct dirent *deInput = NULL;
+    DIR *dr = opendir(INPUT_DIR);
+    if(dr == NULL) {
+        printf("Impossible d'ouvrir le repertoire d'entree :(\n");
+        return NULL;
+    }
+
+	while((deInput = readdir(dr)) != NULL) {
+		pthread_mutex_lock(&stack.lock);
+
+			if(stack.count < stack.max) {
+				/** traitement de l'img **/
+				Image img = open_bitmap(strcat(INPUT_DIR, deInput->d_name));
+				Image new_i;
+				apply_effect(&img, &new_i);
+				stack.data[stack.count] = &new_i;
+				stack.count++;
+				printf("[PRODUCER] J'ai produit !\n");
+				pthread_cond_signal(&stack.can_consume);
+			} else {
+				printf("[PRODUCER] Je ne peux plus produire :(\n");
+				while(stack.count >= stack.max) {
+					pthread_cond_wait(&stack.can_produce, &stack.lock);
+				}
+				printf("[PRODUCER] Je peux a nouveau produire :)\n");
+			}
+
+		pthread_mutex_unlock(&stack.lock);
+	}
+	closedir(dr);
+}
+
 /************************************ le consommateur ************************************/
 void* consumer(void* arg);
 void* consumer(void* arg) {
@@ -87,7 +128,7 @@ void* consumer(void* arg) {
 			}
 			/** consommation de l'img **/
 			printf("[CONSUMER] Je consomme !\n");
-			save_bitmap(stack.data[stack.count], "test_out.bmp"); 
+			save_bitmap(stack.data[stack.count], strcat(OUTPUT_DIR, "output.bmp")); 
 			stack.count--;
 			printf("[CONSUMER] J'ai finit, la nouvelle image est sur le disque !\n");
 			pthread_cond_signal(&stack.can_produce);
