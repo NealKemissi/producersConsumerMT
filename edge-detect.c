@@ -55,8 +55,6 @@ void stack_init() {
 }
 
 /************************************ les producteurs ************************************/
-
-//********************************** deuxieme methode
 void* producing(void* arg);
 void* producing(void* arg) {
 	char *const *argv = (char *const *) arg;
@@ -73,13 +71,15 @@ void* producing(void* arg) {
 
 			if(stack.count < stack.max) {
 				/** traitement de l'img **/
-				Image img = open_bitmap(strcat(argv[INDEX_INPUT_DIR], deInput->d_name));
+				char *inputFile = get_input_file(arv, deInput);
+				Image img = open_bitmap(inputFile);
 				Image new_i;
 				apply_effect(&img, &new_i);
 				stack.data[stack.count] = new_i;
 				stack.count++;
 				printf("[PRODUCER] J'ai produit !\n");
 				pthread_cond_signal(&stack.can_consume);
+				inputFile = NULL;
 			} else {
 				printf("[PRODUCER] Je ne peux plus produire :(\n");
 				while(stack.count >= stack.max) {
@@ -106,15 +106,42 @@ void* consumer(void* arg) {
 			}
 			stack.count--;
 			/** consommation de l'img **/
+			char *outputFile = get_output_file(argv, deInput->d_name);
 			printf("[CONSUMER] Je consomme !\n");
 			printf("[CONSUMER] Path : %s\n", strcat(argv[INDEX_OUTPUT_DIR], "output.bmp"));
-			save_bitmap(stack.data[stack.count], strcat(argv[INDEX_OUTPUT_DIR], "_output.bmp")); 
+			save_bitmap(stack.data[stack.count], outputFile); 
 			printf("[CONSUMER] J'ai finit, la nouvelle image est sur le disque !\n");
 			pthread_cond_signal(&stack.can_produce);
+			outputFile = NULL;
 		
 		pthread_mutex_unlock(&stack.lock);
 	}
 	return 0;
+}
+
+/************************************ utilitaires manipulations fichiers ************************************/
+char *get_input_file(char *const *argv, const struct dirent *deInput) {
+	const unsigned long inputDirLength = strlen(argv[INDEX_INPUT_DIR]) + strlen(deInput->d_name);
+    char *inputFile = malloc(sizeof(char) * (inputDirLength));
+    if (NULL == inputFile) {
+        fprintf(stderr, "[PRODUCER] Allocation impossible :(\n");
+    }
+    inputFile = strcat(inputFile, argv[INDEX_INPUT_DIR]);
+    inputFile = strcat(inputFile, deInput->d_name);
+
+    return inputFile;
+}
+
+char *get_output_file(char *const *argv, char *ch) {
+    const unsigned long outPutDirLength = strlen(argv[INDEX_OUTPUT_DIR]) + strlen(ch);
+    char *outputFile = malloc(sizeof(char) * (outPutDirLength));
+    if (NULL == outputFile) {
+        fprintf(stderr, "[CONSUMER] Allocation impossible :(\n");
+    }
+    outputFile = strcat(outputFile, argv[INDEX_OUTPUT_DIR]);
+    outputFile = strcat(outputFile, ch);
+
+    return outputFile;
 }
 
 /************************************ apply effect ************************************/
