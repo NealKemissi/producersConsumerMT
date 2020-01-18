@@ -17,8 +17,8 @@
 #define OFFSET DIM /2
 #define STACK_MAX 10
 #define NB_THREADS_MAX 2
-#define INPUT_DIR "/input"
-#define OUTPUT_DIR "/output"
+#define INPUT_DIR "/home/neal/Documents/projetgcc/producersConsumerMT/input/"
+#define OUTPUT_DIR "/home/neal/Documents/projetgcc/producersConsumerMT/output/"
 
 const float KERNEL[DIM][DIM] = {{-1, -1,-1},
 							   {-1,8,-1},
@@ -33,7 +33,7 @@ typedef struct Color_t {
 
 /************************************ la pile partagée ************************************/
 typedef struct stack_t {
-	Image* data[STACK_MAX]; // le tableau contient des pointeurs de l'img
+	Image data[STACK_MAX]; // le tableau contient des pointeurs de l'img
 	int count;
 	int max;
 	pthread_mutex_t lock;
@@ -53,36 +53,10 @@ void stack_init() {
 }
 
 /************************************ les producteurs ************************************/
-void* producer(void* arg);
-void* producer(void* arg) {
-	while(true) {
-		pthread_mutex_lock(&stack.lock);
-
-			if(stack.count < stack.max) {
-				/** traitement de l'img **/
-				Image img = open_bitmap("bmp_tank.bmp");
-				Image new_i;
-				apply_effect(&img, &new_i);
-				stack.data[stack.count] = &new_i;
-				stack.count++;
-				printf("[PRODUCER] J'ai produit !\n");
-				pthread_cond_signal(&stack.can_consume);
-			} else {
-				printf("[PRODUCER] Je ne peux plus produire :(\n");
-				while(stack.count >= stack.max) {
-					pthread_cond_wait(&stack.can_produce, &stack.lock);
-				}
-				printf("[PRODUCER] Je peux a nouveau produire :)\n");
-			}
-
-		pthread_mutex_unlock(&stack.lock);
-	}
-	return NULL;
-}
 
 //********************************** deuxieme methode
 void* producing(void* arg);
-void *producing(void* arg) {
+void* producing(void* arg) {
 	/** pointer du repertoire d'entree **/
 	struct dirent *deInput = NULL;
     DIR *dr = opendir(INPUT_DIR);
@@ -99,7 +73,7 @@ void *producing(void* arg) {
 				Image img = open_bitmap(strcat(INPUT_DIR, deInput->d_name));
 				Image new_i;
 				apply_effect(&img, &new_i);
-				stack.data[stack.count] = &new_i;
+				stack.data[stack.count] = new_i;
 				stack.count++;
 				printf("[PRODUCER] J'ai produit !\n");
 				pthread_cond_signal(&stack.can_consume);
@@ -119,7 +93,7 @@ void *producing(void* arg) {
 /************************************ le consommateur ************************************/
 void* consumer(void* arg);
 void* consumer(void* arg) {
-	while(true) {
+	while(1) {
 		pthread_mutex_lock(&stack.lock);
 			
 			while(stack.count == 0) {
@@ -135,7 +109,7 @@ void* consumer(void* arg) {
 		
 		pthread_mutex_unlock(&stack.lock);
 	}
-	return NULL;
+	return 0;
 }
 
 /************************************ apply effect ************************************/
@@ -181,16 +155,17 @@ int main(int argc, char** argv) {
 	// apply_effect(&img, &new_i);
 	// save_bitmap(new_i, "test_out.bmp");
 
+	pthread_t threads_id[5];
 	stack_init();
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 	/** creation des N producteurs **/
-	for(int i = 0; i < NB_THREADS_MAX; i++) {
-		pthread_create(&threads_id[i], &attr, producer, NULL);
+	for(int i = 0; i < 4; i++) {
+		pthread_create(&threads_id[i], &attr, producing, NULL);
 	}
 	/** creation du consommateur **/
-	pthread_create(&threads_id[NB_THREADS_MAX], NULL, consumer, NULL);
+	pthread_create(&threads_id[4], NULL, consumer, NULL);
 	/** on attends le consommateur **/
 	pthread_join(threads_id[4] ,NULL);
 
