@@ -17,8 +17,10 @@
 #define OFFSET DIM /2
 #define STACK_MAX 10
 #define NB_THREADS_MAX 2
-#define INPUT_DIR "/home/neal/Documents/projetgcc/producersConsumerMT/input/"
-#define OUTPUT_DIR "/home/neal/Documents/projetgcc/producersConsumerMT/output/"
+//#define INPUT_DIR "/home/neal/Documents/projetgcc/producersConsumerMT/input/"
+//#define OUTPUT_DIR "/home/neal/Documents/projetgcc/producersConsumerMT/output/"
+#define INDEX_INPUT_DIR 6
+#define INDEX_OUTPUT_DIR 7
 
 const float KERNEL[DIM][DIM] = {{-1, -1,-1},
 							   {-1,8,-1},
@@ -57,11 +59,12 @@ void stack_init() {
 //********************************** deuxieme methode
 void* producing(void* arg);
 void* producing(void* arg) {
+	char *const *argv = (char *const *) arg;
 	/** pointer du repertoire d'entree **/
 	struct dirent *deInput = NULL;
-    DIR *dr = opendir(INPUT_DIR);
+    DIR *dr = opendir(argv[INDEX_INPUT_DIR]);
     if(dr == NULL) {
-        printf("Impossible d'ouvrir le repertoire d'entree :(\n");
+        printf("[PRODUCER] Impossible d'ouvrir le repertoire d'entree :(\n");
         return NULL;
     }
 
@@ -70,7 +73,7 @@ void* producing(void* arg) {
 
 			if(stack.count < stack.max) {
 				/** traitement de l'img **/
-				Image img = open_bitmap(strcat(INPUT_DIR, deInput->d_name));
+				Image img = open_bitmap(strcat(argv[INDEX_INPUT_DIR], deInput->d_name));
 				Image new_i;
 				apply_effect(&img, &new_i);
 				stack.data[stack.count] = new_i;
@@ -93,6 +96,7 @@ void* producing(void* arg) {
 /************************************ le consommateur ************************************/
 void* consumer(void* arg);
 void* consumer(void* arg) {
+	char *const *argv = (char *const *) arg;
 	while(1) {
 		pthread_mutex_lock(&stack.lock);
 			
@@ -102,7 +106,7 @@ void* consumer(void* arg) {
 			}
 			/** consommation de l'img **/
 			printf("[CONSUMER] Je consomme !\n");
-			save_bitmap(stack.data[stack.count], strcat(OUTPUT_DIR, "output.bmp")); 
+			save_bitmap(stack.data[stack.count], strcat(argv[INDEX_OUTPUT_DIR], "output.bmp")); 
 			stack.count--;
 			printf("[CONSUMER] J'ai finit, la nouvelle image est sur le disque !\n");
 			pthread_cond_signal(&stack.can_produce);
@@ -162,10 +166,10 @@ int main(int argc, char** argv) {
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 	/** creation des N producteurs **/
 	for(int i = 0; i < 4; i++) {
-		pthread_create(&threads_id[i], &attr, producing, NULL);
+		pthread_create(&threads_id[i], &attr, producing, (void*) argv); // ON DONNE EN ARGS LE DOSSIER INPUT
 	}
 	/** creation du consommateur **/
-	pthread_create(&threads_id[4], NULL, consumer, NULL);
+	pthread_create(&threads_id[4], NULL, consumer, (void*) argv);
 	/** on attends le consommateur **/
 	pthread_join(threads_id[4] ,NULL);
 

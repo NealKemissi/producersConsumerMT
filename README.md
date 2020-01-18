@@ -20,7 +20,11 @@ Depuis le terminal, lancer l'executable généré.
 
 ```bash
 ./a.out 
-	-O2 -ftree-vectorize -fopt-info -mavx2 -fopt-info-vec-all 
+	-O2 
+	-ftree-vectorize 
+	-fopt-info 
+	-mavx2 
+	-fopt-info-vec-all 
 	/home/neal/Documents/projetgcc/producersConsumerMT/input/ 
 	/home/neal/Documents/projetgcc/producersConsumerMT/output/ 
 	-boxblur -edgedetect -sharpen -lpthread
