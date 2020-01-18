@@ -104,10 +104,11 @@ void* consumer(void* arg) {
 				printf("[CONSUMER] Rien a consommer :( \n");
 				pthread_cond_wait(&stack.can_consume, &stack.lock);
 			}
+			stack.count--;
 			/** consommation de l'img **/
 			printf("[CONSUMER] Je consomme !\n");
-			save_bitmap(stack.data[stack.count], strcat(argv[INDEX_OUTPUT_DIR], "output.bmp")); 
-			stack.count--;
+			printf("[CONSUMER] Path : %s\n", strcat(argv[INDEX_OUTPUT_DIR], "output.bmp"));
+			save_bitmap(stack.data[stack.count], strcat(argv[INDEX_OUTPUT_DIR], "_output.bmp")); 
 			printf("[CONSUMER] J'ai finit, la nouvelle image est sur le disque !\n");
 			pthread_cond_signal(&stack.can_produce);
 		
@@ -158,6 +159,16 @@ int main(int argc, char** argv) {
 	// Image new_i;
 	// apply_effect(&img, &new_i);
 	// save_bitmap(new_i, "test_out.bmp");
+	printf("[INFO] ----------------------------------------------------------------\n");
+	printf("[INFO] Lancement du programme ...\n");
+	printf("[INFO] ----------------------------------------------------------------\n");
+	printf("[INFO]\n");
+	printf("[INFO] Dossier d'entree : %s\n", argv[INDEX_INPUT_DIR]);
+	printf("[INFO] Dossier de sortie : %s\n", argv[INDEX_OUTPUT_DIR]);
+	printf("[INFO]\n");
+	printf("[INFO] ----------------------------------------------------------------\n");
+	printf("[INFO]\n");
+	printf("[INFO]\n");
 
 	pthread_t threads_id[5];
 	stack_init();
