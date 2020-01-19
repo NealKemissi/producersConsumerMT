@@ -54,6 +54,32 @@ void stack_init() {
 	srand(time(NULL));
 }
 
+/************************************ utilitaires manipulations fichiers ************************************/
+char *get_input_file(char *const *argv, char *ch);
+char *get_input_file(char *const *argv, char *ch) {
+	const unsigned long inputDirLength = strlen(argv[INDEX_INPUT_DIR]) + strlen(ch);
+    char *inputFile = malloc(sizeof(char) * (inputDirLength));
+    if (NULL == inputFile) {
+        printf(stderr, "[PRODUCER] Allocation impossible :(\n");
+    }
+    inputFile = strcat(inputFile, argv[INDEX_INPUT_DIR]);
+    inputFile = strcat(inputFile, ch);
+
+    return inputFile;
+}
+char *get_output_file(char *const *argv, char *ch);
+char *get_output_file(char *const *argv, char *ch) {
+    const unsigned long outPutDirLength = strlen(argv[INDEX_OUTPUT_DIR]) + strlen(ch);
+    char *outputFile = malloc(sizeof(char) * (outPutDirLength));
+    if (NULL == outputFile) {
+        printf(stderr, "[CONSUMER] Allocation impossible :(\n");
+    }
+    outputFile = strcat(outputFile, argv[INDEX_OUTPUT_DIR]);
+    outputFile = strcat(outputFile, ch);
+
+    return outputFile;
+}
+
 /************************************ les producteurs ************************************/
 void* producing(void* arg);
 void* producing(void* arg) {
@@ -71,7 +97,8 @@ void* producing(void* arg) {
 
 			if(stack.count < stack.max) {
 				/** traitement de l'img **/
-				char *inputFile = get_input_file(arv, deInput);
+				char *inputFile = get_input_file(argv, deInput->d_name);
+				printf("[PRODUCER] Je produit.....(%s)\n", inputFile);
 				Image img = open_bitmap(inputFile);
 				Image new_i;
 				apply_effect(&img, &new_i);
@@ -97,6 +124,8 @@ void* producing(void* arg) {
 void* consumer(void* arg);
 void* consumer(void* arg) {
 	char *const *argv = (char *const *) arg;
+	int cpt = 0;
+
 	while(1) {
 		pthread_mutex_lock(&stack.lock);
 			
@@ -105,43 +134,25 @@ void* consumer(void* arg) {
 				pthread_cond_wait(&stack.can_consume, &stack.lock);
 			}
 			stack.count--;
+			cpt++;
 			/** consommation de l'img **/
-			char *outputFile = get_output_file(argv, deInput->d_name);
+			char filename[20];
+			sprintf(filename, "output%d.bmp", cpt);
+			char *outputFile = get_output_file(argv, filename);
+
 			printf("[CONSUMER] Je consomme !\n");
-			printf("[CONSUMER] Path : %s\n", strcat(argv[INDEX_OUTPUT_DIR], "output.bmp"));
+			printf("[CONSUMER] Path : %s\n", outputFile);
 			save_bitmap(stack.data[stack.count], outputFile); 
 			printf("[CONSUMER] J'ai finit, la nouvelle image est sur le disque !\n");
-			pthread_cond_signal(&stack.can_produce);
 			outputFile = NULL;
-		
+			if(cpt >= 11) {
+                printf("[CONSUMER] Les %d images ont toutes ete sauvegardees !\n", 11);
+                break;
+            }
+			pthread_cond_signal(&stack.can_produce);
 		pthread_mutex_unlock(&stack.lock);
 	}
 	return 0;
-}
-
-/************************************ utilitaires manipulations fichiers ************************************/
-char *get_input_file(char *const *argv, const struct dirent *deInput) {
-	const unsigned long inputDirLength = strlen(argv[INDEX_INPUT_DIR]) + strlen(deInput->d_name);
-    char *inputFile = malloc(sizeof(char) * (inputDirLength));
-    if (NULL == inputFile) {
-        fprintf(stderr, "[PRODUCER] Allocation impossible :(\n");
-    }
-    inputFile = strcat(inputFile, argv[INDEX_INPUT_DIR]);
-    inputFile = strcat(inputFile, deInput->d_name);
-
-    return inputFile;
-}
-
-char *get_output_file(char *const *argv, char *ch) {
-    const unsigned long outPutDirLength = strlen(argv[INDEX_OUTPUT_DIR]) + strlen(ch);
-    char *outputFile = malloc(sizeof(char) * (outPutDirLength));
-    if (NULL == outputFile) {
-        fprintf(stderr, "[CONSUMER] Allocation impossible :(\n");
-    }
-    outputFile = strcat(outputFile, argv[INDEX_OUTPUT_DIR]);
-    outputFile = strcat(outputFile, ch);
-
-    return outputFile;
 }
 
 /************************************ apply effect ************************************/
@@ -211,5 +222,9 @@ int main(int argc, char** argv) {
 	/** on attends le consommateur **/
 	pthread_join(threads_id[4] ,NULL);
 
+	printf("[INFO]\n");
+	printf("[INFO] ----------------------------------------------------------------\n");
+	printf("[INFO] Fin du programme\n");
+	printf("[INFO] ----------------------------------------------------------------\n");
 	return 0;
 }
