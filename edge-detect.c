@@ -36,7 +36,10 @@ typedef struct Color_t {
 /************************************ la pile partagée ************************************/
 typedef struct stack_t {
 	Image data[STACK_MAX]; // le tableau contient des pointeurs de l'img
+	char* names_files[STACK_MAX];
+	int count_in;
 	int count;
+	int files_treated;
 	int max;
 	pthread_mutex_t lock;
 	pthread_cond_t can_consume;
@@ -79,34 +82,56 @@ char *get_output_file(char *const *argv, char *ch) {
 
     return outputFile;
 }
-
-/************************************ les producteurs ************************************/
-void* producing(void* arg);
-void* producing(void* arg) {
+void *get_all_files(void* arg);
+void *get_all_files(void* arg) {
 	char *const *argv = (char *const *) arg;
 	/** pointer du repertoire d'entree **/
 	struct dirent *deInput = NULL;
     DIR *dr = opendir(argv[INDEX_INPUT_DIR]);
     if(dr == NULL) {
-        printf("[PRODUCER] Impossible d'ouvrir le repertoire d'entree :(\n");
-        return NULL;
+        printf("[INFO] Impossible d'ouvrir le repertoire d'entree.\n");
+        return -1;
     }
+    /** on recup tout les noms d'img pour la suite (uniquement les .bmp) **/
+    while((deInput = readdir(dr)) != NULL) {
+    	if (strstr(deInput->d_name, ".bmp") != NULL) {
+    		const unsigned long length = strlen(argv[INDEX_INPUT_DIR]) + strlen(deInput->d_name);
+    		char *input = malloc(sizeof(char) * (length));
+    		if (input == NULL) {
+        		printf(stderr, "[INFO] Allocation impossible :(\n");
+    		}
+    		input = strcat(input, argv[INDEX_INPUT_DIR]);
+    		input = strcat(input, deInput->d_name);
 
-	while((deInput = readdir(dr)) != NULL) {
+    		printf("[INFO] %s\n", input);
+    		stack.names_files[stack.count_in] = input;
+        	stack.count_in ++;
+		}
+    }
+    closedir(dr);
+    printf("[INFO]\n");
+    printf("[INFO] Nombre  Total d'image a traiter : %d\n", stack.count_in);
+    return 0;
+}
+
+/************************************ les producteurs ************************************/
+void* producing(void* arg);
+void* producing(void* arg) {
+	char *const *argv = (char *const *) arg;
+
+	while(1) {
 		pthread_mutex_lock(&stack.lock);
 
 			if(stack.count < stack.max) {
 				/** traitement de l'img **/
-				char *inputFile = get_input_file(argv, deInput->d_name);
-				printf("[PRODUCER] Je produit.....(%s)\n", inputFile);
-				Image img = open_bitmap(inputFile);
+				printf("[PRODUCER] Je produit.....(%s)\n", stack.names_files[stack.count]);
+				Image img = open_bitmap(stack.names_files[stack.count]);
 				Image new_i;
 				apply_effect(&img, &new_i);
 				stack.data[stack.count] = new_i;
 				stack.count++;
 				printf("[PRODUCER] J'ai produit !\n");
 				pthread_cond_signal(&stack.can_consume);
-				inputFile = NULL;
 			} else {
 				printf("[PRODUCER] Je ne peux plus produire :(\n");
 				while(stack.count >= stack.max) {
@@ -117,7 +142,7 @@ void* producing(void* arg) {
 
 		pthread_mutex_unlock(&stack.lock);
 	}
-	closedir(dr);
+	return 0;
 }
 
 /************************************ le consommateur ************************************/
@@ -138,13 +163,21 @@ void* consumer(void* arg) {
 			/** consommation de l'img **/
 			char filename[20];
 			sprintf(filename, "output%d.bmp", cpt);
-			char *outputFile = get_output_file(argv, filename);
+			const unsigned long length = strlen(argv[INDEX_OUTPUT_DIR]) + strlen(filename);
+    		char *output = malloc(sizeof(char) * (length));
+    		if (output == NULL) {
+        		printf(stderr, "[CONSUMER] Allocation impossible :(\n");
+    		}
+    		output = strcat(output, argv[INDEX_OUTPUT_DIR]);
+    		output = strcat(output, filename);
+
 
 			printf("[CONSUMER] Je consomme !\n");
-			printf("[CONSUMER] Path : %s\n", outputFile);
-			save_bitmap(stack.data[stack.count], outputFile); 
+			printf("[CONSUMER] Path : %s\n", output);
+			save_bitmap(stack.data[stack.count], output); 
 			printf("[CONSUMER] J'ai finit, la nouvelle image est sur le disque !\n");
-			outputFile = NULL;
+			output = NULL;
+			free(output);
 			if(cpt >= 11) {
                 printf("[CONSUMER] Les %d images ont toutes ete sauvegardees !\n", 11);
                 break;
@@ -206,7 +239,9 @@ int main(int argc, char** argv) {
 	printf("[INFO]\n");
 	printf("[INFO] ----------------------------------------------------------------\n");
 	printf("[INFO]\n");
+	get_all_files((void*) argv);
 	printf("[INFO]\n");
+	printf("[INFO] ----------------------------------------------------------------\n");
 
 	pthread_t threads_id[5];
 	stack_init();
