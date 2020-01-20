@@ -92,22 +92,22 @@ void *get_all_files(void* arg);
 void *get_all_files(void* arg) {
 	char *const *argv = (char *const *) arg;
 	/** pointer du repertoire d'entree **/
-	struct dirent *deInput = NULL;
+	struct dirent *dr_input = NULL;
     DIR *dr = opendir(argv[INDEX_INPUT_DIR]);
     if(dr == NULL) {
         printf("[INFO] Impossible d'ouvrir le repertoire d'entree.\n");
         return -1;
     }
     /** on recup tout les noms d'img pour la suite (uniquement les .bmp) **/
-    while((deInput = readdir(dr)) != NULL) {
-    	if (strstr(deInput->d_name, ".bmp") != NULL) {
-    		const unsigned long length = strlen(argv[INDEX_INPUT_DIR]) + strlen(deInput->d_name);
+    while((dr_input = readdir(dr)) != NULL) {
+    	if (strstr(dr_input->d_name, ".bmp") != NULL) {
+    		const unsigned long length = strlen(argv[INDEX_INPUT_DIR]) + strlen(dr_input->d_name);
     		char *input = malloc(sizeof(char) * (length));
     		if (input == NULL) {
         		printf(stderr, "[INFO] Allocation impossible :(\n");
     		}
     		input = strcat(input, argv[INDEX_INPUT_DIR]);
-    		input = strcat(input, deInput->d_name);
+    		input = strcat(input, dr_input->d_name);
 
     		printf("[INFO] %s\n", input);
     		stack.names_files[stack.count_in] = input;
