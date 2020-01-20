@@ -15,8 +15,8 @@
 #define DIM 3
 #define LENGHT DIM
 #define OFFSET DIM /2
-#define STACK_MAX 10
-#define NB_THREADS_MAX 2
+#define STACK_MAX 4
+#define NB_THREADS 3
 //#define INPUT_DIR "/home/neal/Documents/projetgcc/producersConsumerMT/input/"
 //#define OUTPUT_DIR "/home/neal/Documents/projetgcc/producersConsumerMT/output/"
 #define INDEX_INPUT_DIR 6
@@ -39,7 +39,6 @@ typedef struct stack_t {
 	char* names_files[STACK_MAX];
 	int count_in;
 	int count;
-	int files_treated;
 	int max;
 	pthread_mutex_t lock;
 	pthread_cond_t can_consume;
@@ -159,25 +158,22 @@ void* consumer(void* arg) {
 				pthread_cond_wait(&stack.can_consume, &stack.lock);
 			}
 			stack.count--;
-			cpt++;
+			
 			/** consommation de l'img **/
-			char filename[20];
+			char *filename[20];
 			sprintf(filename, "output%d.bmp", cpt);
-			const unsigned long length = strlen(argv[INDEX_OUTPUT_DIR]) + strlen(filename);
-    		char *output = malloc(sizeof(char) * (length));
-    		if (output == NULL) {
-        		printf(stderr, "[CONSUMER] Allocation impossible :(\n");
-    		}
-    		output = strcat(output, argv[INDEX_OUTPUT_DIR]);
-    		output = strcat(output, filename);
+			char *output[200];
+    		strcat(output, argv[INDEX_OUTPUT_DIR]);
+    		strcat(output, filename);
 
 
 			printf("[CONSUMER] Je consomme !\n");
-			printf("[CONSUMER] Path : %s\n", output);
-			save_bitmap(stack.data[stack.count], output); 
+			printf("[CONSUMER] Sauvegarde de : %s\n", output);
+			save_bitmap(stack.data[stack.count], output);
+			cpt++;
 			printf("[CONSUMER] J'ai finit, la nouvelle image est sur le disque !\n");
-			output = NULL;
-			free(output);
+			*filename = '\0';
+			*output = '\0';
 			if(cpt >= 11) {
                 printf("[CONSUMER] Les %d images ont toutes ete sauvegardees !\n", 11);
                 break;
@@ -243,19 +239,19 @@ int main(int argc, char** argv) {
 	printf("[INFO]\n");
 	printf("[INFO] ----------------------------------------------------------------\n");
 
-	pthread_t threads_id[5];
+	pthread_t threads_id[NB_THREADS];
 	stack_init();
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 	/** creation des N producteurs **/
-	for(int i = 0; i < 4; i++) {
+	for(int i = 0; i < NB_THREADS-1; i++) {
 		pthread_create(&threads_id[i], &attr, producing, (void*) argv); // ON DONNE EN ARGS LE DOSSIER INPUT
 	}
 	/** creation du consommateur **/
-	pthread_create(&threads_id[4], NULL, consumer, (void*) argv);
+	pthread_create(&threads_id[NB_THREADS], NULL, consumer, (void*) argv);
 	/** on attends le consommateur **/
-	pthread_join(threads_id[4] ,NULL);
+	pthread_join(threads_id[NB_THREADS] ,NULL);
 
 	printf("[INFO]\n");
 	printf("[INFO] ----------------------------------------------------------------\n");
