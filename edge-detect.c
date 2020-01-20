@@ -16,11 +16,10 @@
 #define LENGHT DIM
 #define OFFSET DIM /2
 #define STACK_MAX 4
-#define NB_THREADS 3
-//#define INPUT_DIR "/home/neal/Documents/projetgcc/producersConsumerMT/input/"
-//#define OUTPUT_DIR "/home/neal/Documents/projetgcc/producersConsumerMT/output/"
 #define INDEX_INPUT_DIR 6
 #define INDEX_OUTPUT_DIR 7
+#define NB_THREADS 8
+#define EFFECT 9
 
 const float KERNEL[DIM][DIM] = {{-1, -1,-1},
 							   {-1,8,-1},
@@ -57,30 +56,38 @@ void stack_init() {
 }
 
 /************************************ utilitaires manipulations fichiers ************************************/
-char *get_input_file(char *const *argv, char *ch);
-char *get_input_file(char *const *argv, char *ch) {
-	const unsigned long inputDirLength = strlen(argv[INDEX_INPUT_DIR]) + strlen(ch);
-    char *inputFile = malloc(sizeof(char) * (inputDirLength));
-    if (NULL == inputFile) {
-        printf(stderr, "[PRODUCER] Allocation impossible :(\n");
-    }
-    inputFile = strcat(inputFile, argv[INDEX_INPUT_DIR]);
-    inputFile = strcat(inputFile, ch);
+void *clean_output_directory(void* arg);
+void *clean_output_directory(void* arg) {
+	char *const *argv = (char *const *) arg;
+	/** pointer du repertoire de sortie **/
+	struct dirent *dr_output;
+    DIR *dr_o = opendir(argv[INDEX_OUTPUT_DIR]);
 
-    return inputFile;
-}
-char *get_output_file(char *const *argv, char *ch);
-char *get_output_file(char *const *argv, char *ch) {
-    const unsigned long outPutDirLength = strlen(argv[INDEX_OUTPUT_DIR]) + strlen(ch);
-    char *outputFile = malloc(sizeof(char) * (outPutDirLength));
-    if (NULL == outputFile) {
-        printf(stderr, "[CONSUMER] Allocation impossible :(\n");
+    /** creation du dossier si absent **/
+    if (dr_o == NULL) {
+        mkdir(argv[INDEX_OUTPUT_DIR], 0777);
+        return 0;
     }
-    outputFile = strcat(outputFile, argv[INDEX_OUTPUT_DIR]);
-    outputFile = strcat(outputFile, ch);
-
-    return outputFile;
+    while((dr_output = readdir(dr_o)) != NULL) {
+    	if (strstr(dr_output->d_name, ".bmp") != NULL) {
+    		const unsigned long length_out = strlen(argv[INDEX_OUTPUT_DIR]) + strlen(dr_output->d_name);
+    		char *file_to_delete = malloc(sizeof(char) * (length_out));
+    		if (file_to_delete == NULL) {
+        		printf("[ERROR] Allocation impossible :(\n");
+        		return 0;
+    		}
+    		file_to_delete = strcat(file_to_delete, argv[INDEX_OUTPUT_DIR]);
+    		file_to_delete = strcat(file_to_delete, dr_output->d_name);
+    		printf("[INFO] Suppression de %s\n", file_to_delete);
+    		remove(file_to_delete);
+    	}
+    }
+    closedir(dr_o);
+    printf("[INFO]\n");
+    printf("[INFO] Le dossier de sortie a bien ete nettoye !\n");
+    return 0;
 }
+
 void *get_all_files(void* arg);
 void *get_all_files(void* arg) {
 	char *const *argv = (char *const *) arg;
@@ -108,6 +115,11 @@ void *get_all_files(void* arg) {
 		}
     }
     closedir(dr);
+    if(stack.count_in == 0) {
+    	printf("[ERROR]\n");
+    	printf("[ERROR] Le dossier d'entree est vide\n");
+    	return -1;
+    }
     printf("[INFO]\n");
     printf("[INFO] Nombre  Total d'image a traiter : %d\n", stack.count_in);
     return 0;
@@ -222,12 +234,24 @@ void apply_effect(Image* original, Image* new_i) {
 /* 									MAIN 									  */
 /******************************************************************************/
 int main(int argc, char** argv) {
-	// Image img = open_bitmap("bmp_tank.bmp");
-	// Image new_i;
-	// apply_effect(&img, &new_i);
-	// save_bitmap(new_i, "test_out.bmp");
+
 	printf("[INFO] ----------------------------------------------------------------\n");
 	printf("[INFO] Lancement du programme ...\n");
+	printf("[INFO] ----------------------------------------------------------------\n");
+	printf("[INFO]\n");
+
+	/** si il manque un parametre **/
+	if(argv[INDEX_INPUT_DIR] == NULL || argv[INDEX_OUTPUT_DIR] == NULL || argv[NB_THREADS] == NULL || argv[EFFECT] == NULL) {
+		printf("[ERROR] ---------------------------------------------------------------\n");
+		printf("[ERROR] Des parametres sont manquants. Veuillez respecter le format :\n");
+		printf("[ERROR] ./apply-effect \"./in/\" \"./out/\" 3 boxblur\n");
+		printf("[ERROR] ---------------------------------------------------------------\n");
+		return -1;
+	}
+	/** le dossier de sortie est vide quand le programme demmarre **/
+	clean_output_directory((void*) argv);
+
+	printf("[INFO]\n");
 	printf("[INFO] ----------------------------------------------------------------\n");
 	printf("[INFO]\n");
 	printf("[INFO] Dossier d'entree : %s\n", argv[INDEX_INPUT_DIR]);
@@ -235,23 +259,27 @@ int main(int argc, char** argv) {
 	printf("[INFO]\n");
 	printf("[INFO] ----------------------------------------------------------------\n");
 	printf("[INFO]\n");
+	
+	/** on recup tout les fichiers .bmp du dossier input **/
+	/** si il est vide, on quitte le programme **/
 	get_all_files((void*) argv);
+	
 	printf("[INFO]\n");
 	printf("[INFO] ----------------------------------------------------------------\n");
 
-	pthread_t threads_id[NB_THREADS];
+	pthread_t threads_id[atoi(argv[NB_THREADS])];
 	stack_init();
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 	/** creation des N producteurs **/
-	for(int i = 0; i < NB_THREADS-1; i++) {
-		pthread_create(&threads_id[i], &attr, producing, (void*) argv); // ON DONNE EN ARGS LE DOSSIER INPUT
+	for(int i = 0; i < atoi(argv[NB_THREADS])-1; i++) {
+		pthread_create(&threads_id[i], &attr, producing, (void*) argv);
 	}
 	/** creation du consommateur **/
-	pthread_create(&threads_id[NB_THREADS], NULL, consumer, (void*) argv);
+	pthread_create(&threads_id[atoi(argv[NB_THREADS])], NULL, consumer, (void*) argv);
 	/** on attends le consommateur **/
-	pthread_join(threads_id[NB_THREADS] ,NULL);
+	pthread_join(threads_id[atoi(argv[NB_THREADS])] ,NULL);
 
 	printf("[INFO]\n");
 	printf("[INFO] ----------------------------------------------------------------\n");

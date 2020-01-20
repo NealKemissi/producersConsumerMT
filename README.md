@@ -1,8 +1,8 @@
 # producersConsumerMT
 
-Multi-threading producers-consumer project
+Multi-threading producers-consumer project.
 
-## Compiler le programme
+## 1) Compiler le programme
 
 Depuis le terminal.
 
@@ -14,18 +14,10 @@ Ou
 gcc edge-detect.c bitmap.c -O2 -ftree-vectorize -mavx2 -pthread -o apply-effect
 ```
 
-## Lancer le programme
+## 2) Lancer le programme
 
-Depuis le terminal, lancer l'executable généré.
+Depuis le terminal, lancer l'executable généré. (mettre le dossier d'entrée, le dossier de sortie, le nb de threads à utiliser, et l'algo)
 
 ```bash
-./a.out 
-	-O2 
-	-ftree-vectorize 
-	-fopt-info 
-	-mavx2 
-	-fopt-info-vec-all 
-	/home/neal/Documents/projetgcc/producersConsumerMT/input/ 
-	/home/neal/Documents/projetgcc/producersConsumerMT/output/ 
-	-boxblur -edgedetect -sharpen -lpthread
+./a.out -O2 -ftree-vectorize -fopt-info -mavx2 -fopt-info-vec-all /home/neal/Documents/projetgcc/producersConsumerMT/input/ /home/neal/Documents/projetgcc/producersConsumerMT/output/ 4 -boxblur -edgedetect -sharpen -lpthread
 ```
